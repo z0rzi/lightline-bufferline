@@ -107,12 +107,58 @@ function! s:filter_buffer(i)
   return bufexists(a:i) && buflisted(a:i) && !(getbufvar(a:i, '&filetype') ==# 'qf')
 endfunction
 
-function! s:filtered_buffers()
-  let l:buffers = filter(range(1, bufnr('$')), 's:filter_buffer(v:val)')
-  if s:reverse_buffers == 1
-    let l:buffers = reverse(l:buffers)
+function! s:buffer_is_file(bufnr)
+  let notFile = {
+        \   'filetype' : [
+        \     'qf'      , 'vimpager', 'undotree', 'tagbar',
+        \     'nerdtree', 'vimshell', 'vimfiler', 'voom'  ,
+        \     'tabman'  , 'unite'   , 'quickrun', 'Decho',
+        \     'fzf'
+        \   ],
+        \   'bufname' : [
+        \     'GoToFile'                  , 'diffpanel_\d\+'      ,
+        \     '__Gundo_Preview__'         , '__Gundo__'           ,
+        \     '\[LustyExplorer-Buffers\]' , '\-MiniBufExplorer\-' ,
+        \     '_VOOM\d\+$'                , '__Urannotate_\d\+__' ,
+        \     '__MRU_Files__', '.*FZF',  '\[coc-explorer\].*'
+        \   ]
+        \ }
+
+  if index(notFile.filetype, getbufvar(a:bufnr, '&ft')) != -1 ||
+        \ len(getbufvar(a:bufnr, '&buftype'))
+    return 0
   endif
-  return l:buffers
+  let bufname = bufname(a:bufnr)
+  for rx in notFile.bufname
+    if len(matchstr(bufname, rx))
+      return 0
+    endif
+  endfor
+  return 1
+endfunction
+
+function! s:filtered_buffers()
+  if !s:buffer_is_file(bufnr())
+    return s:buffs
+  endif
+
+  if !exists("s:buffs")| let s:buffs = []    |endif
+  if !exists("s:buff") | let s:buff = [0, 0] |endif
+
+  let curbuf = bufnr()
+
+  if s:buff[0] == curbuf && s:buff[1] != changenr()
+    let idx = index(s:buffs, curbuf)
+    if idx != -1
+      call remove(s:buffs, idx)
+    endif
+    call add(s:buffs, curbuf)
+  else
+    let s:buff = [curbuf, changenr()]
+  endif
+  let s:buffs = filter(s:buffs, 's:filter_buffer(v:val)')
+
+  return reverse(copy(s:buffs))
 endfunction
 
 function! s:goto_nth_buffer(n)
@@ -332,9 +378,29 @@ function! lightline#bufferline#go(n)
   call s:goto_nth_buffer(a:n - 1)
 endfunction
 
+function! lightline#bufferline#next()
+  let buffs = s:filtered_buffers()
+  call s:goto_nth_buffer((index(buffs, bufnr()) + 1) % len(buffs))
+endfunction
+
+function! lightline#bufferline#prev()
+  let buffs = s:filtered_buffers()
+  call s:goto_nth_buffer((index(buffs, bufnr()) + len(buffs) - 1) % len(buffs))
+endfunction
+
 function! lightline#bufferline#delete(n)
   call s:delete_nth_buffer(a:n - 1)
 endfunction
+
+" Deleting unused files
+function lightline#bufferline#cleanup()
+  for id in range(1, bufnr('$'))
+    if bufexists(id) && buflisted(id) && bufnr() != id && index(g:buffs, id) == -1 && s:buffer_is_file(id)
+      execute 'sil!bd'.id
+    endif
+  endfor
+endfunction
+
 
 noremap <silent> <Plug>lightline#bufferline#go(1)  :call lightline#bufferline#go(1)<CR>
 noremap <silent> <Plug>lightline#bufferline#go(2)  :call lightline#bufferline#go(2)<CR>
@@ -357,3 +423,5 @@ noremap <silent> <Plug>lightline#bufferline#delete(7)  :call lightline#bufferlin
 noremap <silent> <Plug>lightline#bufferline#delete(8)  :call lightline#bufferline#delete(8)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(9)  :call lightline#bufferline#delete(9)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(10) :call lightline#bufferline#delete(10)<CR>
+
+autocmd CursorHold * sil!call lightline#bufferline#cleanup()
