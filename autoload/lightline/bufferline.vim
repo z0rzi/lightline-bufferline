@@ -148,11 +148,7 @@ function! s:filtered_buffers()
   let curbuf = bufnr()
 
   if s:buff[0] == curbuf && s:buff[1] != changenr()
-    let idx = index(s:buffs, curbuf)
-    if idx != -1
-      call remove(s:buffs, idx)
-    endif
-    call add(s:buffs, curbuf)
+    call lightline#bufferline#add_buff_to_tabs(curbuf)
   else
     let s:buff = [curbuf, changenr()]
   endif
@@ -163,6 +159,15 @@ function! s:filtered_buffers()
   call s:buffer_cleanup()
 
   return reverse(out)
+endfunction
+
+function! lightline#bufferline#add_buff_to_tabs(bufnr)
+  let idx = index(s:buffs, a:bufnr)
+  if idx != -1
+    call remove(s:buffs, idx)
+  endif
+  call add(s:buffs, a:bufnr)
+  redraw!
 endfunction
 
 " Deleting unused files
@@ -409,7 +414,12 @@ function! lightline#bufferline#prev()
 endfunction
 
 function! lightline#bufferline#remove()
-  call lightline#bufferline#prev()
+  let current_index = index(s:buffs, bufnr('%'))
+  if current_index == (len(s:buffs) - 1)
+    call lightline#bufferline#next()
+  else
+    call lightline#bufferline#prev()
+  end
   exe 'bd#'
 endfunction
 
@@ -439,3 +449,5 @@ noremap <silent> <Plug>lightline#bufferline#delete(7)  :call lightline#bufferlin
 noremap <silent> <Plug>lightline#bufferline#delete(8)  :call lightline#bufferline#delete(8)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(9)  :call lightline#bufferline#delete(9)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(10) :call lightline#bufferline#delete(10)<CR>
+
+nnoremap <leader><leader> :call lightline#bufferline#add_buff_to_tabs(bufnr()) <BAR> call lightline#bufferline#buffers()<CR>
