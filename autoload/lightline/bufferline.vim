@@ -158,8 +158,28 @@ function! s:filtered_buffers()
   endif
   let s:buffs = filter(s:buffs, 's:filter_buffer(v:val)')
 
-  return reverse(copy(s:buffs))
+  let out = copy(s:buffs)
+
+  call s:buffer_cleanup()
+
+  return reverse(out)
 endfunction
+
+" Deleting unused files
+" We can't delete them right away, it messes up the display 😓
+function! s:buffer_cleanup()
+  if !exists("s:to_delete")| let s:to_delete = [] |endif
+  for id in s:to_delete
+    execute 'sil!bd'.id
+  endfor
+  let s:to_delete = []
+  for id in range(1, bufnr('$'))
+    if bufexists(id) && buflisted(id) && bufnr() != id && index(s:buffs, id) == -1 && s:buffer_is_file(id)
+      call add(s:to_delete, id)
+    endif
+  endfor
+endfunction
+
 
 function! s:goto_nth_buffer(n)
   let l:buffers = s:filtered_buffers()
@@ -388,17 +408,13 @@ function! lightline#bufferline#prev()
   call s:goto_nth_buffer((index(buffs, bufnr()) + len(buffs) - 1) % len(buffs))
 endfunction
 
-function! lightline#bufferline#delete(n)
-  call s:delete_nth_buffer(a:n - 1)
+function! lightline#bufferline#remove()
+  call lightline#bufferline#prev()
+  exe 'bd#'
 endfunction
 
-" Deleting unused files
-function lightline#bufferline#cleanup()
-  for id in range(1, bufnr('$'))
-    if bufexists(id) && buflisted(id) && bufnr() != id && index(g:buffs, id) == -1 && s:buffer_is_file(id)
-      execute 'sil!bd'.id
-    endif
-  endfor
+function! lightline#bufferline#delete(n)
+  call s:delete_nth_buffer(a:n - 1)
 endfunction
 
 
@@ -423,5 +439,3 @@ noremap <silent> <Plug>lightline#bufferline#delete(7)  :call lightline#bufferlin
 noremap <silent> <Plug>lightline#bufferline#delete(8)  :call lightline#bufferline#delete(8)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(9)  :call lightline#bufferline#delete(9)<CR>
 noremap <silent> <Plug>lightline#bufferline#delete(10) :call lightline#bufferline#delete(10)<CR>
-
-autocmd CursorHold * sil!call lightline#bufferline#cleanup()
