@@ -147,7 +147,12 @@ function! s:filtered_buffers()
 
   let curbuf = bufnr()
 
-  if s:buff[0] == curbuf && s:buff[1] != changenr()
+  let diffmode = 0
+  if exists('&diff')
+    let diffmode = &diff
+  endif
+
+  if diffmode || s:buff[0] == curbuf && s:buff[1] != changenr()
     call lightline#bufferline#add_buff_to_tabs(curbuf)
   else
     let s:buff = [curbuf, changenr()]
@@ -156,7 +161,9 @@ function! s:filtered_buffers()
 
   let out = copy(s:buffs)
 
-  call s:buffer_cleanup()
+  if !diffmode
+    call s:buffer_cleanup()
+  endif
 
   return reverse(out)
 endfunction
@@ -201,6 +208,9 @@ function! s:delete_nth_buffer(n)
 endfunction
 
 function! s:get_buffer_paths(buffers)
+  if &diff
+    return map(a:buffers, 'bufname(v:val)')
+  endif
   if (!s:smart_path)
     return map(a:buffers, 'bufname(v:val)')
   endif
